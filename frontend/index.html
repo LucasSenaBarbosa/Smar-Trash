@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>SMARTTRASH — Sistema de Coleta Otimizada</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+/* ═══ RESET & TOKENS ═══════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#050809; --bg1:#0a1014; --bg2:#101820; --bg3:#16222c; --bg4:#1c2e3c;
+  --border:rgba(0,220,120,.10); --border-hi:rgba(0,220,120,.28);
+  --accent:#00dc78; --blue:#29b6f6; --orange:#ff7043;
+  --red:#ef5350;   --yellow:#ffd740; --purple:#ce93d8;
+  --text:#b8cdd8;  --text-hi:#ddeef8; --dim:#445e70;
+  --c1:#00dc78; --c2:#29b6f6; --c3:#ff7043;
+  --fhd:'Orbitron',sans-serif; --fmono:'IBM Plex Mono',monospace; --r:4px;
+}
+html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--fmono);font-size:12px;overflow:hidden}
+body::after{content:'';pointer-events:none;position:fixed;inset:0;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px)}
+
+/* ═══ ESTRUTURA SPA (Telas independentes) ═════════════════════════════ */
+.page-view {
+  position: absolute; inset: 0; width: 100vw; height: 100vh;
+  opacity: 0; pointer-events: none; transform: scale(0.99);
+  transition: opacity 0.3s cubic-bezier(.4,0,.2,1), transform 0.3s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+}
+.page-view.active {
+  opacity: 1; pointer-events: all; transform: scale(1);
+  z-index: 10;
+}
+
+/* ═══ TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) ══════════════════════════ */
+#pageAuth {
+  display: flex; align-items: center; justify-content: center; background: var(--bg0);
+}
+.auth-container {
+  width: 100%; max-width: 380px; background: var(--bg1); border: 1px solid var(--border);
+  padding: 30px; border-radius: var(--r); box-shadow: 0 12px 40px rgba(0,0,0,0.8);
+  position: relative;
+}
+.auth-container::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent);
+}
+.auth-logo {
+  text-align: center; margin-bottom: 24px;
+}
+.auth-logo h1 {
+  font-family: var(--fhd); font-size: 22px; color: var(--accent); letter-spacing: 4px; text-shadow: 0 0 10px var(--accent);
+}
+.auth-logo p {
+  font-size: 8px; color: var(--dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px;
+}
+.auth-tabs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 20px; background: var(--bg0); padding: 3px; border-radius: 2px;
+}
+.auth-tab {
+  background: transparent; border: none; color: var(--dim); font-family: var(--fhd); font-size: 9px;
+  padding: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s;
+}
+.auth-tab.active {
+  background: var(--bg2); color: var(--accent); border: 1px solid var(--border);
+}
+.form-group {
+  margin-bottom: 15px;
+}
+.form-group label {
+  display: block; font-size: 8px; color: var(--dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px;
+}
+.form-input {
+  width: 100%; background: var(--bg2); border: 1px solid var(--border); color: var(--text-hi);
+  font-family: var(--fmono); padding: 10px 12px; font-size: 11px; border-radius: 2px; transition: all 0.2s;
+}
+.form-input:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 8px rgba(0,220,120,0.15);
+}
+.auth-btn {
+  width: 100%; font-family: var(--fhd); font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 12px;
+  cursor: pointer; border-radius: var(--r); margin-top: 10px; transition: all 0.2s;
+}
+.auth-btn:hover {
+  background: var(--accent); color: var(--bg0); box-shadow: 0 0 16px var(--accent);
+}
+.auth-msg {
+  font-size: 9px; color: var(--red); text-align: center; margin-top: 12px; min-height: 14px;
+}
+
+/* ═══ LAYOUT DASHBOARD (HOME) ═════════════════════════════════════════ */
+.shell{display:grid;grid-template-rows:58px 1fr;grid-template-columns:1fr 340px;height:100vh}
+
+/* ═══ HEADER ════════════════════════════════════════════════════════════ */
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;background:var(--bg1);border-bottom:1px solid var(--border);
+  position:relative;overflow:hidden;}
+header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:sweep 6s linear infinite;}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-mark{width:36px;height:36px;border:1px solid var(--accent);display:grid;place-items:center;
+  font-size:18px;animation:glowbox 3s ease-in-out infinite;}
+@keyframes glowbox{0%,100%{box-shadow:0 0 8px var(--accent)}50%{box-shadow:0 0 22px var(--accent),inset 0 0 8px rgba(0,220,120,.1)}}
+.logo-text{font-family:var(--fhd);font-size:16px;letter-spacing:5px;color:var(--accent);text-shadow:0 0 14px var(--accent)}
+.logo-sub{font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-top:2px}
+.hdr-center{display:flex;align-items:center;gap:20px}
+.phase-indicator{display:flex;align-items:center;gap:7px}
+.ph-dot{width:7px;height:7px;border-radius:50%;background:var(--dim);transition:all .4s}
+.ph-dot.active{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.ph-dot.done{background:var(--accent);opacity:.4}
+.phase-label{font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;min-width:180px;transition:color .3s}
+.phase-label.active{color:var(--accent)}
+.hdr-right{display:flex;align-items:center;gap:20px}
+.clock{font-family:var(--fhd);font-size:20px;color:var(--blue);text-shadow:0 0 12px var(--blue);letter-spacing:3px}
+.op-badge{padding:5px 16px;border:1px solid currentColor;font-family:var(--fhd);font-size:8px;
+  letter-spacing:3px;text-transform:uppercase;transition:all .3s;}
+.op-badge.idle{color:var(--dim)}
+.op-badge.running{color:var(--accent);animation:blink 1s step-end infinite}
+.op-badge.done{color:var(--blue)}
+.op-badge.alert{color:var(--red);animation:blink .5s step-end infinite}
+@keyframes blink{50%{opacity:.2}}
+
+.logout-btn {
+  background: rgba(239,83,80,0.06); border: 1px solid rgba(239,83,80,0.3); color: var(--red);
+  font-family: var(--fhd); font-size: 8px; letter-spacing: 1.5px; padding: 6px 10px; cursor: pointer;
+  border-radius: 2px; text-transform: uppercase; transition: all 0.2s;
+}
+.logout-btn:hover {
+  background: var(--red); color: var(--bg0); box-shadow: 0 0 12px var(--red);
+}
+
+/* ═══ MAIN & PANELS ═════════════════════════════════════════════════════ */
+main{overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+
+.slabel{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--dim);
+  margin-bottom:9px;display:flex;align-items:center;gap:10px;}
+.slabel::after{content:'';flex:1;height:1px;background:var(--border)}
+.slabel span{background:var(--bg2);padding-right:4px}
+
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}
+.kpi{background:var(--bg2);border:1px solid var(--border);padding:12px 14px;
+  position:relative;overflow:hidden;border-radius:var(--r);transition:border-color .3s,transform .2s;}
+.kpi:hover{border-color:var(--border-hi);transform:translateY(-1px)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kcolor,var(--accent))}
+.kpi-val{font-family:var(--fhd);font-size:26px;font-weight:900;line-height:1;
+  color:var(--kcolor,var(--accent));text-shadow:0 0 16px var(--kcolor,var(--accent));
+  margin-bottom:5px;transition:all .4s;}
+.kpi-lbl{font-size:8px;letter-spacing:2px;color:var(--dim);text-transform:uppercase}
+.kpi-sub{font-size:9px;color:var(--dim);margin-top:3px;opacity:.7}
+.kpi-val.bump{animation:bump .3s ease-out}
+@keyframes bump{0%{transform:scale(1.25)}100%{transform:scale(1)}}
+
+/* NOTIFICAÇÕES FLUTUANTES */
+.alert-overlay{position:fixed;top:70px;right:350px;z-index:8000;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:360px;}
+.alert-card{background:var(--bg4);border-radius:var(--r);overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.7);pointer-events:all;transform:translateX(120%);opacity:0;animation:slideIn .4s cubic-bezier(.2,0,.2,1) forwards;}
+@keyframes slideIn{to{transform:translateX(0);opacity:1}}
+.alert-card.out{animation:slideOut .35s ease-in forwards}
+@keyframes slideOut{to{transform:translateX(120%);opacity:0}}
+.alert-stripe{height:3px}
+.alert-stripe.vida{background:linear-gradient(90deg,var(--red),var(--orange))}
+.alert-stripe.bloq{background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.alert-stripe.ok  {background:linear-gradient(90deg,var(--accent),var(--blue))}
+.alert-body{padding:10px 14px}
+.alert-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.alert-ico{font-size:16px}
+.alert-title{font-family:var(--fhd);font-size:9px;letter-spacing:2px}
+.alert-title.vida{color:var(--red)}
+.alert-title.bloq{color:var(--yellow)}
+.alert-title.ok  {color:var(--accent)}
+.alert-txt{font-size:9px;line-height:1.6;color:var(--text)}
+.alert-addr{font-size:9px;color:var(--dim);margin-top:4px;font-style:italic}
+.alert-progress{height:2px;background:var(--bg3);margin-top:8px;border-radius:1px;overflow:hidden}
+.alert-progress-bar{height:100%;background:var(--dim);border-radius:1px;animation:shrink var(--dur,6s) linear forwards}
+@keyframes shrink{from{width:100%}to{width:0%}}
+
+.ticker-wrap{overflow:hidden;width:200px;border:1px solid var(--border);border-radius:2px;padding:4px 8px;background:var(--bg3);}
+.ticker-inner{font-size:8px;color:var(--dim);white-space:nowrap;letter-spacing:1px;text-transform:uppercase;transition:color .3s}
+.ticker-inner.alert{color:var(--red);animation:blink .6s step-end infinite}
+
+.act-banner{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--yellow);padding:9px 14px;border-radius:var(--r);display:none;align-items:center;gap:12px;font-size:10px;}
+.act-banner.show{display:flex}
+.act-banner.blocked{border-left-color:var(--yellow);background:rgba(255,215,64,.04)}
+.act-banner.life{border-left-color:var(--red);background:rgba(239,83,80,.06);animation:alertbg .8s ease-in-out infinite alternate}
+.act-banner.ok{border-left-color:var(--accent)}
+@keyframes alertbg{from{background:rgba(239,83,80,.04)}to{background:rgba(239,83,80,.1)}}
+.ab-ico{font-size:20px;flex-shrink:0}
+.ab-body{flex:1}
+.ab-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--dim)}
+.ab-label.life{color:var(--red)}
+.ab-label.blocked{color:var(--yellow)}
+.ab-main{font-size:11px;color:var(--text-hi);margin-top:2px}
+.ab-addr{font-size:9px;color:var(--dim);margin-top:2px}
+.ab-right{text-align:right;flex-shrink:0}
+.ab-pct{font-family:var(--fhd);font-size:14px}
+.ab-cam{font-size:9px;color:var(--dim);margin-top:2px}
+
+.mid-row{display:grid;grid-template-columns:1fr 1.3fr;gap:12px}
+.panel{background:var(--bg2);border:1px solid var(--border);padding:14px;border-radius:var(--r)}
+.chart-wrap{position:relative;height:176px}
+#barChart{width:100%;height:100%;display:block}
+
+/* GRID DE CAÇAMBAS */
+.cac-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.cac{border:1px solid var(--border);border-radius:3px;background:var(--bg3);padding:5px 4px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;position:relative;overflow:hidden;transition:border-color .3s,transform .15s;min-height:52px;}
+.cac:hover{border-color:var(--border-hi);transform:scale(1.05);z-index:10}
+.cac::before{content:'';position:absolute;bottom:0;left:0;right:0;height:var(--fill,0%);background:var(--fcol,#333);opacity:.22;transition:height .8s cubic-bezier(.4,0,.2,1);}
+.cac.collecting{border-color:var(--yellow)!important;animation:cpulse .7s ease-in-out infinite}
+@keyframes cpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,215,64,.2)}50%{box-shadow:0 0 0 5px rgba(255,215,64,.0)}}
+.cac.life-alert{border-color:var(--red)!important;animation:lpulse .5s ease-in-out infinite}
+@keyframes lpulse{0%,100%{box-shadow:0 0 0 0 rgba(239,83,80,.4)}50%{box-shadow:0 0 0 6px rgba(239,83,80,.0)}}
+.cac.blocked{border-color:var(--yellow)!important;opacity:.6}
+.cac.done{border-color:rgba(0,220,120,.22)!important}
+.cac.skipped{border-color:rgba(255,215,64,.25)!important;opacity:.5}
+.cac.alta {border-color:rgba(239,83,80,.45);--fcol:#ef5350}
+.cac.media{border-color:rgba(255,112,67,.35);--fcol:#ff7043}
+.cac.baixa{border-color:var(--border)}
+.cac-id  {font-size:8px;letter-spacing:.5px;color:var(--dim);z-index:1;font-weight:500}
+.cac-pct {font-family:var(--fhd);font-size:11px;font-weight:700;z-index:1;transition:color .3s}
+.cac.alta   .cac-pct{color:var(--red);text-shadow:0 0 6px var(--red)}
+.cac.media  .cac-pct{color:var(--orange);text-shadow:0 0 6px var(--orange)}
+.cac.baixa  .cac-pct{color:var(--dim)}
+.cac.collecting .cac-pct{color:var(--yellow)}
+.cac.life-alert .cac-pct{color:var(--red)}
+.cac.done   .cac-pct{color:var(--accent);font-size:13px}
+.cac.skipped .cac-pct{color:var(--yellow);font-size:11px}
+.cac.blocked .cac-pct{color:var(--yellow)}
+.cac-bairro{font-size:7px;color:var(--dim);z-index:1;text-align:center;line-height:1.2;opacity:.7}
+
+/* TOOLTIP */
+.tooltip{display:none;position:fixed;z-index:10000;background:var(--bg4);border:1px solid var(--border-hi);border-radius:4px;padding:10px 13px;min-width:230px;box-shadow:0 8px 32px rgba(0,0,0,.6);pointer-events:none;}
+.tooltip.show{display:block}
+.tt-id{font-family:var(--fhd);font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:6px}
+.tt-row{display:flex;justify-content:space-between;gap:16px;margin-bottom:3px;font-size:10px}
+.tt-key{color:var(--dim)} .tt-val{color:var(--text-hi);text-align:right;max-width:150px}
+.tt-addr{font-size:10px;color:var(--text);margin-top:6px;padding-top:6px;border-top:1px solid var(--border);line-height:1.5}
+
+/* CARDS DE CAMINHÕES (HOME) */
+.trucks-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.truck{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:13px;transition:all .3s;overflow:hidden;position:relative;cursor:pointer;}
+.truck:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,220,120,0.15)}
+.truck::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--tc,var(--dim));transition:background .3s}
+.truck.active::before{box-shadow:0 0 12px var(--tc)}
+.truck.incident::before{background:var(--red)!important;box-shadow:0 0 12px var(--red)!important}
+.truck-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.truck-title{font-family:var(--fhd);font-size:10px;letter-spacing:2px;color:var(--tc,var(--dim))}
+.truck-st{font-size:8px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;margin-top:2px}
+.truck-st.warn{color:var(--yellow)} .truck-st.err{color:var(--red)} .truck-st.ok{color:var(--accent)}
+.truck-num{font-family:var(--fhd);font-size:24px;font-weight:900;color:var(--tc,var(--dim));text-shadow:0 0 14px var(--tc,transparent);line-height:1}
+.prog-wrap{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;margin:7px 0}
+.prog-bar{height:100%;width:0%;background:var(--tc,var(--dim));box-shadow:0 0 8px var(--tc,transparent);transition:width .6s ease;border-radius:2px}
+.truck-meta{display:flex;justify-content:space-between;font-size:8px;color:var(--dim)}
+
+.resultado{background:var(--bg2);border:1px solid var(--accent);border-radius:var(--r);padding:14px;box-shadow:0 0 40px rgba(0,220,120,.07);display:none;}
+.resultado.show{display:block}
+.resultado-body{max-height:110px;overflow-y:auto;font-size:10px;line-height:1.8;color:var(--text);white-space:pre-wrap;scrollbar-width:thin;}
+
+/* SIDEBAR (FEED DE AGENTES) */
+aside{border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg1);overflow:hidden}
+.log-hdr{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.log-hdr-title{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--dim)}
+.log-live{display:flex;align-items:center;gap:6px;font-size:8px;color:var(--dim)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--dim);transition:background .3s}
+.live-dot.on{background:var(--accent);animation:lp 1.2s ease-in-out infinite}
+.live-dot.alert{background:var(--red);animation:lp .5s ease-in-out infinite}
+
+.log-feed{overflow-y:auto;flex:1;padding:8px 10px;display:flex;flex-direction:column;gap:3px;}
+.le {padding:5px 8px;border-left:2px solid var(--border);font-size:9px;line-height:1.55;background:rgba(255,255,255,.012);word-break:break-word;}
+.le.agent {border-color:var(--accent)} .le.task {border-color:var(--blue)} .le.result{border-color:var(--orange)} .le.warn {border-color:var(--red)}
+.le.vida {border-color:var(--red);background:rgba(239,83,80,.09)} .le.bloq {border-color:var(--yellow)} .le.sec {border-color:var(--purple)}
+.le .tag {font-weight:600;margin-right:4px}
+.le.agent .tag{color:var(--accent)} .le.task .tag{color:var(--blue)} .le.result .tag{color:var(--orange)} .le.warn .tag{color:var(--red)}
+.le .ts{float:right;color:var(--dim);font-size:7px}
+
+.phase-track{padding:9px 12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
+.pt-row{display:flex;align-items:center;gap:8px;font-size:8px;letter-spacing:1px;color:var(--dim)}
+.pt-num{width:18px;height:18px;border-radius:50%;border:1px solid var(--dim);display:grid;place-items:center;font-family:var(--fhd);font-size:7px;flex-shrink:0;}
+.pt-row.active .pt-num{border-color:var(--accent);color:var(--accent);box-shadow:0 0 8px var(--accent)}
+.pt-row.done   .pt-num{background:var(--accent);border-color:var(--accent);color:var(--bg0)}
+.pt-row.active{color:var(--text-hi)} .pt-row.done{color:var(--accent);opacity:.6}
+
+.ctrl{padding:11px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.btn{font-family:var(--fhd);font-size:8px;letter-spacing:3px;text-transform:uppercase;border:1px solid currentColor;background:transparent;color:var(--accent);padding:10px;cursor:pointer;border-radius:var(--r);transition:all .2s;width:100%;}
+.btn:hover:not(:disabled){background:var(--accent);color:var(--bg0);box-shadow:0 0 24px var(--accent)}
+.btn:disabled{color:var(--dim);cursor:not-allowed;border-color:var(--border)}
+.btn.sec{color:var(--dim)} .btn.sec:hover:not(:disabled){background:var(--dim);color:var(--bg0)}
+
+.inc-strip{padding:7px 12px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.inc-item{background:var(--bg3);border-radius:3px;padding:5px 8px;border:1px solid var(--border)}
+.inc-n{font-family:var(--fhd);font-size:14px;font-weight:700;color:var(--dim);}
+.inc-n.has{color:var(--red)}
+.inc-l{font-size:7px;letter-spacing:1px;text-transform:uppercase;color:var(--dim)}
+
+/* ═══ TELA 3: PAGINA DE TELEMETRIA DETALHADA E SENSORES (Request) ══════ */
+#pageDetails {
+  background: var(--bg0); padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+}
+.details-nav {
+  display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 14px;
+}
+.home-btn {
+  background: transparent; border: 1px solid var(--accent); color: var(--accent); font-family: var(--fhd);
+  font-size: 10px; letter-spacing: 2px; padding: 10px 18px; border-radius: var(--r); cursor: pointer; text-transform: uppercase; transition: all 0.2s;
+}
+.home-btn:hover {
+  background: var(--accent); color: var(--bg0); box-shadow: 0 0 16px var(--accent);
+}
+.details-grid {
+  display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start;
+}
+.details-truck-card {
+  background: var(--bg1); border: 1px solid var(--border); border-top: 3px solid var(--det-color, var(--accent)); padding: 20px; border-radius: var(--r);
+}
+.dt-title { font-family: var(--fhd); font-size: 20px; color: var(--det-color, var(--text-hi)); letter-spacing: 2px; margin-bottom: 4px; }
+.dt-status { font-family: var(--fhd); font-size: 10px; color: var(--yellow); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 16px; }
+.dt-metric-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+.dt-box { background: var(--bg2); border: 1px solid var(--border); padding: 8px 10px; border-radius: 2px; }
+.dt-box-lbl { font-size: 7px; color: var(--dim); text-transform: uppercase; }
+.dt-box-val { font-family: var(--fhd); font-size: 16px; color: var(--text-hi); margin-top: 2px; }
+
+.sensor-panel { background: var(--bg1); border: 1px solid var(--border); padding: 20px; border-radius: var(--r); }
+.sensor-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 10px; }
+.sensor-table th { font-family: var(--fhd); font-size: 8px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; padding: 10px 12px; border-bottom: 1px solid var(--border-hi); }
+.sensor-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+.sensor-table tr:hover td { background: rgba(255,255,255,0.015); }
+.st-badge { padding: 3px 6px; font-size: 8px; font-weight: 600; border-radius: 2px; text-transform: uppercase; }
+.st-badge.coletado { background: rgba(0,220,120,0.12); color: var(--accent); }
+.st-badge.processo { background: rgba(255,215,64,0.12); color: var(--yellow); }
+.st-badge.espera { background: rgba(68,94,112,0.2); color: var(--dim); }
+.st-badge.alerta { background: rgba(239,83,80,0.15); color: var(--red); }
+
+.dt-report-area { margin-top: 14px; background: var(--bg2); border: 1px solid var(--border); padding: 14px; border-radius: 2px; font-size: 10px; line-height: 1.6; font-family: var(--fmono); white-space: pre-wrap; height: 180px; overflow-y: auto; }
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TELA 1: AUTENTICAÇÃO (LOGIN / CADASTRO)
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page-view active" id="pageAuth">
+  <div class="auth-container">
+    <div class="auth-logo">
+      <h1 id="authTitle">SMARTTRASH</h1>
+      <p>Acesso Autenticado de Operações</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchAuthMode('login')">Login</button>
+      <button class="auth-tab" id="tabCadastro" onclick="switchAuthMode('cadastro')">Cadastro</button>
+    </div>
+    <form id="authForm" onsubmit="handleAuth(event)">
+      <div class="form-group">
+        <label>E-mail Corporativo</label>
+        <input type="email" id="authEmail" class="form-input" required placeholder="operador@smarttrash.ai"/>
+      </div>
+      <div class="form-group">
+        <label>Chave de Segurança (Senha)</label>
+        <input type="password" id="authPassword" class="form-input" required placeholder="••••••••"/>
+      </div>
+      <button type="submit" class="auth-btn" id="submitAuthBtn">Entrar no Sistema</button>
+    </form>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TELA 2: DASHBOARD CENTRAL (HOME)
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page-view" id="pageHome">
+  <div class="shell">
+    <header>
+      <div class="logo">
+        <div class="logo-mark">♻️</div>
+        <div>
+          <div class="logo-text">SMARTTRASH</div>
+          <div class="logo-sub">Central de Coleta Inteligente · CrewAI · Taboão da Serra / SP</div>
+        </div>
+      </div>
+      <div class="hdr-center">
+        <div class="phase-indicator">
+          <div class="ph-dot" id="pd0"></div>
+          <div class="ph-dot" id="pd1"></div>
+          <div class="ph-dot" id="pd2"></div>
+          <div class="ph-dot" id="pd3"></div>
+        </div>
+        <div class="phase-label" id="phaseLabel">AGUARDANDO OPERAÇÃO</div>
+        <div class="ticker-wrap"><div class="ticker-inner" id="ticker">SISTEMA NOMINAL · NENHUM INCIDENTE</div></div>
+      </div>
+      <div class="hdr-right">
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="op-badge idle" id="opBadge">AGUARDANDO</div>
+        <button class="logout-btn" onclick="logout()">Sair</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="kpi-row">
+        <div class="kpi" style="--kcolor:var(--accent)">
+          <div class="kpi-val">20</div>
+          <div class="kpi-lbl">Caçambas Rastreadas</div>
+          <div class="kpi-sub">Taboão da Serra · SP</div>
+        </div>
+        <div class="kpi" style="--kcolor:var(--blue)">
+          <div class="kpi-val" id="kColetas">0</div>
+          <div class="kpi-lbl">Coletas Concluídas</div>
+          <div class="kColetasSub" id="kColetasSub" style="font-size:9px;color:var(--dim);margin-top:3px">—</div>
+        </div>
+        <div class="kpi" style="--kcolor:var(--yellow)">
+          <div class="kpi-val" id="kBloq">0</div>
+          <div class="kpi-lbl">Impedimentos</div>
+          <div class="kBloqSub" id="kBloqSub" style="font-size:9px;color:var(--dim);margin-top:3px">rotas desimpedidas</div>
+        </div>
+        <div class="kpi" style="--kcolor:var(--red)">
+          <div class="kpi-val" id="kVida">0</div>
+          <div class="kpi-lbl">Alertas Biológicos</div>
+          <div class="kVidaSub" id="kVidaSub" style="font-size:9px;color:var(--dim);margin-top:3px">purgador seguro</div>
+        </div>
+        <div class="kpi" style="--kcolor:var(--orange)">
+          <div class="kpi-val" id="kEfic">—</div>
+          <div class="kpi-lbl">Performance Global</div>
+          <div class="kEficSub" id="kEficSub" style="font-size:9px;color:var(--dim);margin-top:3px">frota aguardando</div>
+        </div>
+      </div>
+
+      <div class="act-banner" id="actBanner">
+        <div class="ab-ico" id="abIco">🗑️</div>
+        <div class="ab-body">
+          <div class="ab-label" id="abLabel">Coletando agora</div>
+          <div class="ab-main" id="abMain">—</div>
+          <div class="ab-addr" id="abAddr">—</div>
+        </div>
+        <div class="ab-right">
+          <div class="ab-pct" id="abPct">—</div>
+          <div class="ab-cam" id="abCam">—</div>
+        </div>
+      </div>
+
+      <div class="mid-row">
+        <div class="panel">
+          <div class="slabel"><span>Métrica de Carga Descarregada</span></div>
+          <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+        </div>
+        <div class="panel">
+          <div class="slabel"><span>Disposição Territorial das Caçambas</span></div>
+          <div class="cac-grid" id="cacGrid"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="slabel"><span>Unidades Operacionais de Campo (Clique para abrir Telemetria e Sensores)</span></div>
+        <div class="trucks-row" id="trucksRow"></div>
+      </div>
+
+      <div class="resultado" id="resultado">
+        <div class="slabel"><span>Compilado Estratégico Final</span></div>
+        <div class="resultado-body" id="resultadoBody"></div>
+      </div>
+    </main>
+
+    <aside>
+      <div class="log-hdr">
+        <div class="log-hdr-title">Logs do Barramento IA</div>
+        <div class="log-live"><div class="live-dot" id="liveDot"></div><span id="liveLabel">offline</span></div>
+      </div>
+      <div class="log-feed" id="logFeed"></div>
+      <div class="inc-strip">
+        <div class="inc-item">
+          <div class="inc-n" id="incVida">0</div>
+          <div class="inc-l">Bloqueios Fauna</div>
+        </div>
+        <div class="inc-item">
+          <div class="inc-n" id="incBloq">0</div>
+          <div class="inc-l">Obstrução Via</div>
+        </div>
+      </div>
+      <div class="phase-track">
+        <div class="pt-row" id="pt0"><div class="pt-num">1</div><span>Análise Estática de Sensores</span></div>
+        <div class="pt-row" id="pt1"><div class="pt-num">2</div><span>Cálculo de Grafos de Rota</span></div>
+        <div class="pt-row" id="pt2"><div class="pt-num">3</div><span>Execução Assíncrona de Coleta</span></div>
+        <div class="pt-row" id="pt3"><div class="pt-num">4</div><span>Fechamento Gerencial</span></div>
+      </div>
+      <div class="ctrl">
+        <button class="btn" id="btnStart" onclick="iniciar()">▶ Iniciar Operação</button>
+        <button class="btn sec" id="btnReset" onclick="resetar()">↺ Resetar Telemetria</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TELA 3: PAGINA DE TELEMETRIA COMPLETA (PAGINA INDEPENDENTE)
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page-view" id="pageDetails">
+  <div class="details-nav">
+    <div>
+      <h2 style="font-family:var(--fhd); font-size:16px; color:var(--accent); letter-spacing:2px">CENTRAL DE TELEMETRIA AVANÇADA</h2>
+      <p style="font-size:9px; color:var(--dim); text-transform:uppercase; margin-top:2px; letter-spacing:1px">Mapeamento de sensores físicos, barramento e segurança preditiva</p>
+    </div>
+    <button class="home-btn" onclick="navegarParaHome()">← Voltar para a Home</button>
+  </div>
+
+  <div class="details-grid">
+    <!-- Card do Caminhão -->
+    <div class="details-truck-card" id="dtTruckCard">
+      <div class="dt-title" id="dtTruckTitle">CAMINHÃO 01</div>
+      <div class="dt-status" id="dtTruckStatus">EM OPERAÇÃO</div>
+      
+      <div class="dt-metric-row">
+        <div class="dt-box">
+          <div class="dt-box-lbl">Aproveitamento</div>
+          <div class="dt-box-val" id="dtTruckCount">0/0</div>
+        </div>
+        <div class="dt-box">
+          <div class="dt-box-lbl">Sensores Ativos</div>
+          <div class="dt-box-val" id="dtSensorCount">5/5</div>
+        </div>
+      </div>
+
+      <div class="slabel"><span>Diagnóstico do Barramento</span></div>
+      <div class="dt-report-area" id="dtReportBox">Aguardando consolidação de dados dos agentes de telemetria...</div>
+    </div>
+
+    <!-- Painel de Sensores Físicos das Caçambas -->
+    <div class="sensor-panel">
+      <div class="slabel"><span>Mapeamento Bruto de Sensores por Ponto Histórico</span></div>
+      <table class="sensor-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Localização / Bairro</th>
+            <th>Sensor Carga (Vol.)</th>
+            <th>Sensor IR (Presença)</th>
+            <th>Status do Nó</th>
+          </tr>
+        </thead>
+        <tbody id="dtSensorTableBody">
+          <!-- Gerado via Javascript -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="alert-overlay" id="alertOverlay"></div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   MÓDULO DE AUTENTICAÇÃO & FILTRO SPA
+   ═══════════════════════════════════════════════════════════════════════ */
+let authMode = 'login';
+
+function switchAuthMode(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').className = 'auth-tab' + (mode === 'login' ? ' active' : '');
+  document.getElementById('tabCadastro').className = 'auth-tab' + (mode === 'cadastro' ? ' active' : '');
+  document.getElementById('submitAuthBtn').textContent = mode === 'login' ? 'Entrar no Sistema' : 'Concluir Cadastro';
+  document.getElementById('authMsg').textContent = '';
+}
+
+function handleAuth(e) {
+  e.preventDefault();
+  const email = document.getElementById('authEmail').value;
+  const msgEl = document.getElementById('authMsg');
+  
+  if(authMode === 'login') {
+    msgEl.style.color = 'var(--accent)';
+    msgEl.textContent = 'Autenticando chave corporativa...';
+    setTimeout(() => {
+      document.getElementById('pageAuth').classList.remove('active');
+      document.getElementById('pageHome').classList.add('active');
+      msgEl.textContent = '';
+    }, 1000);
+  } else {
+    msgEl.style.color = 'var(--accent)';
+    msgEl.textContent = 'Operador registrado no banco SMARTTRASH.';
+    setTimeout(() => switchAuthMode('login'), 1500);
+  }
+}
+
+function logout() {
+  document.getElementById('pageHome').classList.remove('active');
+  document.getElementById('pageDetails').classList.remove('active');
+  document.getElementById('pageAuth').add('active');
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+}
+
+function navegarParaDetalhes(truckId) {
+  selectedTruckId = truckId;
+  document.getElementById('pageHome').classList.remove('active');
+  document.getElementById('pageDetails').classList.add('active');
+  renderizarPaginaDetalhes();
+}
+
+function navegarParaHome() {
+  selectedTruckId = null;
+  document.getElementById('pageDetails').classList.remove('active');
+  document.getElementById('pageHome').classList.add('active');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TELEMETRIA CORE & SIMULAÇÃO SMARTTRASH
+   ═══════════════════════════════════════════════════════════════════════ */
+const CACAMBAS = [
+  {id:'C01',rua:'R. das Aces, 234',          bairro:'Jardim Maria Rosa',    pct:0},
+  {id:'C02',rua:'Av. Rotary, 890',            bairro:'Centro',              pct:0},
+  {id:'C03',rua:'R. Cel. José Alves, 145',   bairro:'Vila Boa Vista',      pct:0},
+  {id:'C04',rua:'R. Esperança, 512',          bairro:'Jd. Bom Clima',      pct:0},
+  {id:'C05',rua:'R. das Figueiras, 67',       bairro:'Chácara Sta. Maria', pct:0},
+  {id:'C06',rua:'Av. Ibirama, 1200',          bairro:'Parque Pinheiros',   pct:0},
+  {id:'C07',rua:'R. João Pessoa, 330',        bairro:'Vila Olímpia',       pct:0},
+  {id:'C08',rua:'R. Tupinambás, 88',          bairro:'Jardim Marajoara',   pct:0},
+  {id:'C09',rua:'Av. Presidente Dutra, 4455', bairro:'Jd. América',        pct:0},
+  {id:'C10',rua:'R. dos Ipês, 200',           bairro:'Parque São Lucas',   pct:0},
+  {id:'C11',rua:'R. Joaquim Nabuco, 77',      bairro:'Vila Nova',          pct:0},
+  {id:'C12',rua:'Estrada Anastácio, 1870',    bairro:'Estância Sto. A.',   pct:0},
+  {id:'C13',rua:'R. N. Sra. das Graças, 143', bairro:'Jd. das Flores',    pct:0},
+  {id:'C14',rua:'R. Paes Leme, 910',          bairro:'Parque Gramado',     pct:0},
+  {id:'C15',rua:'R. Benedito Cotrim, 55',     bairro:'Alto do Parque',     pct:0},
+  {id:'C16',rua:'R. Cel. Franco, 1020',       bairro:'Centro',             pct:0},
+  {id:'C17',rua:'R. da Imprensa, 320',        bairro:'Vila Imperial',      pct:0},
+  {id:'C18',rua:'Av. Antônio Fernandes, 680', bairro:'Jd. Represa',        pct:0},
+  {id:'C19',rua:'R. Geraldo Cardim, 1150',    bairro:'Parque Assunção',    pct:0},
+  {id:'C20',rua:'R. Ipiranga, 440',           bairro:'Jd. Alvorada',       pct:0},
+];
+
+function randomizarNiveis() {
+  CACAMBAS.forEach(c => {
+    c.pct = Math.floor(Math.random() * 76) + 25; 
+    c.coletada = false; c.coletando = false; c.caminhao = null; c.evento = null; c.eventoDetalhe = null;
+  });
+}
+randomizarNiveis();
+
+const TRUCKS=[
+  {id:1,color:'var(--c1)',coletas:0,total:0,status:'STANDBY',rotas:[],eventos:[]},
+  {id:2,color:'var(--c2)',coletas:0,total:0,status:'STANDBY',rotas:[],eventos:[]},
+  {id:3,color:'var(--c3)',coletas:0,total:0,status:'STANDBY',rotas:[],eventos:[]},
+];
+
+const INC = {vida:0, bloq:0};
+let running=false, selectedTruckId=null;
+
+const BLOQUEIOS = [
+  'Obras na malha viária', 'Colisão de veículos', 'Queda de árvore comercial',
+  'Instabilidade de encosta', 'Manutenção da SABESP', 'Feira regional ativa'
+];
+
+const VIDA_TIPOS = [
+  {tipo:'canino', emoji:'🐕', desc:'Fauna urbana (Canino)', temp:'38.7°C'},
+  {tipo:'felino', emoji:'🐈', desc:'Fauna urbana (Felino)', temp:'38.1°C'},
+  {tipo:'humano', emoji:'👤', desc:'Presença biológica (Humano)', temp:'36.5°C'}
+];
+
+const RESOLUCOES = [
+  'Removido com segurança sob protocolo', 'Evacuação voluntária monitorada', 'Apoio ambiental liberou o perímetro'
+];
+
+function sorteioEvento(c) {
+  const r = Math.random();
+  if (r < 0.12) return { tipo:'vida', detalhe: VIDA_TIPOS[Math.floor(Math.random()*VIDA_TIPOS.length)] };
+  if (r < 0.27) return { tipo:'bloq', motivo: BLOQUEIOS[Math.floor(Math.random()*BLOQUEIOS.length)] };
+  return null;
+}
+
+function tick(){ document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8); }
+setInterval(tick,1000); tick();
+function nowStr(){ return new Date().toTimeString().slice(0,8); }
+
+function setTicker(txt, alert=false){
+  const el=document.getElementById('ticker');
+  el.textContent=txt; el.className='ticker-inner'+(alert?' alert':'');
+}
+
+function log(text,type='sys'){
+  const feed=document.getElementById('logFeed');
+  const el=document.createElement('div'); el.className=`le ${type}`;
+  const tags={agent:'AGENTE',task:'TAREFA',result:'OUTPUT',warn:'ALERTA',vida:'VIDA',bloq:'BLOQUEIO',sec:'SEGURANÇA',sys:'SISTEMA'};
+  el.innerHTML=`<span class="tag">[${tags[type]||'LOG'}]</span><span class="ts">${nowStr()}</span>${esc(text)}`;
+  feed.appendChild(el); feed.scrollTop=feed.scrollHeight;
+}
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function setPhase(n){
+  for(let i=0;i<4;i++){
+    document.getElementById(`pd${i}`).className='ph-dot'+(i<n?' done':i===n?' active':'');
+    document.getElementById(`pt${i}`).className='pt-row'+(i<n?' done':i===n?' active':'');
+  }
+  const lbl=document.getElementById('phaseLabel');
+  lbl.className='phase-label'+(n<4?' active':'');
+  lbl.textContent=n<4?['ANÁLISE DE SENSORES','OTIMIZAÇÃO DE ROTAS','EXECUÇÃO DE COLETA','GERANDO RELATÓRIO'][n]:'OPERAÇÃO CONCLUÍDA';
+}
+
+function setBadge(cls,txt){
+  const b=document.getElementById('opBadge'); b.className=`op-badge ${cls}`; b.textContent=txt;
+}
+
+function showNotif(type, title, body, addr){
+  const overlay=document.getElementById('alertOverlay');
+  const card=document.createElement('div'); card.className='alert-card';
+  const icons={vida:'🚨',bloq:'🚧',ok:'✅'};
+  card.innerHTML=`
+    <div class="alert-stripe ${type}"></div>
+    <div class="alert-body">
+      <div class="alert-hdr"><span class="alert-ico">${icons[type]}</span><span class="alert-title ${type}">${title}</span></div>
+      <div class="alert-txt">${body}</div>
+      <div class="alert-progress"><div class="alert-progress-bar" style="--dur:6000ms"></div></div>
+    </div>`;
+  overlay.appendChild(card);
+  setTimeout(()=>{ card.classList.add('out'); setTimeout(()=>card.remove(), 400); }, 6000);
+}
+
+function showBanner(mode, c, truck, extra=''){
+  const b=document.getElementById('actBanner'); b.className=`act-banner show ${mode}`;
+  document.getElementById('abIco').textContent  = mode==='life'?'🚨':'🗑️';
+  document.getElementById('abLabel').textContent = mode==='life'?'VIDA DETECTADA':'Coletando agora';
+  document.getElementById('abMain').textContent  = extra || (c?`${c.id} — ${c.bairro}`:'');
+  document.getElementById('abAddr').textContent  = c?`📍 ${c.rua}`:'';
+  document.getElementById('abPct').textContent   = c?c.pct+'%':'';
+  document.getElementById('abCam').textContent   = truck?`Caminhão 0${truck.id}`:'';
+}
+function hideBanner(){ document.getElementById('actBanner').className='act-banner'; }
+
+function renderCacambas(){
+  const grid=document.getElementById('cacGrid'); grid.innerHTML='';
+  CACAMBAS.forEach(c=>{
+    let cls=c.coletada?'done':c.coletando?'collecting':'';
+    if(!cls) cls=c.pct>=90?'alta':c.pct>=70?'media':'baixa';
+    if(c.evento==='vida') cls='life-alert';
+    if(c.evento==='bloq') cls='skipped';
+    const div=document.createElement('div'); div.className=`cac ${cls}`; div.id=`cac-${c.id}`;
+    div.style.setProperty('--fill',c.pct+'%');
+    div.innerHTML=`<span class="cac-id">${c.id}</span><span class="cac-pct">${c.coletada?'✓':c.pct+'%'}</span><span class="cac-bairro">${c.bairro.slice(0,8)}</span>`;
+    grid.appendChild(div);
+  });
+}
+
+function updateCac(c){
+  const el=document.getElementById(`cac-${c.id}`); if(!el) return;
+  let cls=c.coletada?'done':c.coletando?'collecting':'';
+  if(!cls) cls=c.pct>=90?'alta':c.pct>=70?'media':'baixa';
+  if(c.evento==='vida') cls='life-alert';
+  if(c.evento==='bloq') cls='skipped';
+  el.className=`cac ${cls}`;
+  el.querySelector('.cac-pct').textContent=c.coletada?'✓':c.coletando?'…':c.pct+'%';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDERIZAÇÃO DA PÁGINA DE TELEMETRIA (TELA NOVA)
+   ═══════════════════════════════════════════════════════════════════════ */
+function renderizarPaginaDetalhes() {
+  if (selectedTruckId === null) return;
+  const t = TRUCKS.find(x => x.id === selectedTruckId);
+  if (!t) return;
+
+  // Atualizar Card de Perfil Técnico
+  document.getElementById('dtTruckCard').style.setProperty('--det-color', t.color);
+  document.getElementById('dtTruckTitle').textContent = `CAMINHÃO 0${t.id}`;
+  document.getElementById('dtTruckStatus').textContent = `STATUS OPERACIONAL: ${t.status}`;
+  document.getElementById('dtTruckCount').textContent = `${t.coletas}/${t.total}`;
+  document.getElementById('dtSensorCount').textContent = `${t.rotas.length} Nós`;
+
+  // Construir Diário do Barramento IA
+  const rBox = document.getElementById('dtReportBox');
+  let logTxt = `[NÚCLEO SMARTTRASH - CRON DE TELEMETRIA]\n`;
+  logTxt += `Módulo de Escalonamento Ativo: Rota 0${t.id}\n`;
+  logTxt += `Pontos Identificados: ${t.total} caçambas críticas\n`;
+  logTxt += `───────────────────────────────────────\n`;
+  logTxt += `HISTÓRICO DA ROTA:\n`;
+  
+  if (t.eventos.length === 0) {
+    logTxt += `· Aguardando deploy ou sem dados na fila.`;
+  } else {
+    t.eventos.forEach(ev => {
+      if (ev.type === 'ok') logTxt += `· [INFO] Caçamba ${ev.cac} purgada e limpa.\n`;
+      if (ev.type === 'bloq') logTxt += `· [OBSTRUÇÃO] Linha impedida no nó ${ev.cac}. Motivo: ${ev.motivo}\n`;
+      if (ev.type === 'vida') logTxt += `· [CRÍTICO] Infravermelho detectou calor biológico no nó ${ev.cac}.\n`;
+    });
+  }
+  rBox.textContent = logTxt;
+  rBox.scrollTop = rBox.scrollHeight;
+
+  // Montar Tabela Completa de Sensores Físicos
+  const tbody = document.getElementById('dtSensorTableBody');
+  tbody.innerHTML = '';
+
+  if(t.rotas.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--dim)">Nenhuma caçamba pendente na rota deste caminhão.</td></tr>`;
+  } else {
+    t.rotas.forEach(c => {
+      let tr = document.createElement('tr');
+      let sensorIr = '0.00 (Vazio)';
+      let badge = `<span class="st-badge espera">Espera</span>`;
+
+      if (c.coletando) {
+        badge = `<span class="st-badge processo">Em Coleta</span>`;
+      } else if (c.coletada) {
+        badge = `<span class="st-badge coletado">Purgado</span>`;
+      } else if (c.evento === 'bloq') {
+        badge = `<span class="st-badge alerta">Impedimento</span>`;
+      } else if (c.evento === 'vida') {
+        badge = `<span class="st-badge alerta">Alerta IR</span>`;
+        sensorIr = `ATIVO (${c.eventoDetalhe?.temp || '38°C'})`;
+      }
+
+      tr.innerHTML = `
+        <td style="font-family:var(--fhd); color:var(--accent)">${c.id}</td>
+        <td><strong>${c.bairro}</strong><br><span style="color:var(--dim); font-size:8px">${c.rua}</span></td>
+        <td style="font-family:var(--fhd)">${c.pct}%</td>
+        <td style="color:${sensorIr.includes('ATIVO') ? 'var(--red)' : 'var(--dim)'}">${sensorIr}</td>
+        <td>${badge}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+}
+
+function renderTrucks(){
+  const row=document.getElementById('trucksRow'); row.innerHTML='';
+  TRUCKS.forEach(t=>{
+    const pct=t.total>0?Math.round(t.coletas/t.total*100):0;
+    const div=document.createElement('div');
+    div.className=`truck ${t.status!=='STANDBY'?'active':''} ${t.eventos.length>0?'incident':''}`;
+    div.style.setProperty('--tc',t.color);
+    div.setAttribute('onclick', `navegarParaDetalhes(${t.id})`); // Encaminha para página dedicada
+
+    div.innerHTML=`
+      <div class="truck-hdr">
+        <div><div class="truck-title">UNIDADE SMART-0${t.id}</div><div class="truck-st">${t.status}</div></div>
+        <div class="truck-num">${t.coletas}</div>
+      </div>
+      <div class="prog-wrap"><div class="prog-bar" style="width:${pct}%"></div></div>
+      <div class="truck-meta"><span>${t.coletas}/${t.total} Purgas</span><span>${pct}%</span></div>`;
+    row.appendChild(div);
+  });
+  if(document.getElementById('pageDetails').classList.contains('active')) renderizarPaginaDetalhes();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MOTOR GRÁFICO (CANVAS)
+   ═══════════════════════════════════════════════════════════════════════ */
+function drawChart(){
+  const canvas=document.getElementById('barChart'); if(!canvas) return;
+  const ctx=canvas.getContext('2d'); const dpr=window.devicePixelRatio||1;
+  canvas.width=canvas.offsetWidth*dpr; canvas.height=canvas.offsetHeight*dpr; ctx.scale(dpr,dpr);
+  const W=canvas.offsetWidth, H=canvas.offsetHeight, PL=30, PT=20, cW=W-40, cH=H-45;
+  ctx.clearRect(0,0,W,H);
+  const max=Math.max(...TRUCKS.map(t=>t.coletas),1);
+  TRUCKS.forEach((t,i)=>{
+    const x=PL + i*(cW/3), bH=(t.coletas/max)*cH, y=PT+cH-bH;
+    ctx.fillStyle=t.color; ctx.fillRect(x+10,y,cW/3-20,bH);
+    ctx.fillStyle='var(--dim)'; ctx.font='8px IBM Plex Mono'; ctx.fillText(`SMART-0${t.id}`,x+15,PT+cH+15);
+  });
+}
+
+function atualizarKpis(){
+  const col=CACAMBAS.filter(c=>c.coletada).length;
+  document.getElementById('kColetas').textContent=col;
+  document.getElementById('kBloq').textContent=INC.bloq;
+  document.getElementById('kVida').textContent=INC.vida;
+  document.getElementById('incVida').textContent=INC.vida;
+  document.getElementById('incBloq').textContent=INC.bloq;
+  if(col>0) document.getElementById('kEfic').textContent=Math.round(col/CACAMBAS.filter(c=>c.pct>=70).length*100)+'%';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ORQUESTRADOR DE FLUXO IA SIMULADO
+   ═══════════════════════════════════════════════════════════════════════ */
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+async function iniciar(){
+  if(running) return; running=true;
+  document.getElementById('btnStart').disabled=true;
+  document.getElementById('liveDot').className='live-dot on';
+  document.getElementById('liveLabel').textContent='online';
+  setBadge('running','EM OPERAÇÃO');
+
+  // FASE 1: Análise Estática
+  setPhase(0); log('Carregando mapeamento de telemetria SMARTTRASH...','sys'); await delay(1000);
+  CACAMBAS.forEach(c=>log(`Nó ${c.id}: Volume de Carga em ${c.pct}%`,'sys'));
+  
+  // FASE 2: Otimização de Grafos
+  setPhase(1); await delay(1000); log('Orquestrador CrewAI computando rotas ótimas...','agent');
+  CACAMBAS.filter(c=>c.pct>=70).forEach((c,i)=>{
+    const t=TRUCKS[i%3]; t.total++; c.caminhao=t.id; t.rotas.push(c);
+  });
+  renderTrucks();
+
+  // FASE 3: Execução Assíncrona
+  setPhase(2);
+  const tarefas = TRUCKS.map(async t => {
+    t.status='EM ROTA'; renderTrucks();
+    for(const c of t.rotas){
+      t.status='OPERANDO'; c.coletando=true; updateCac(c); renderTrucks();
+      showBanner('collecting',c,t); log(`Unidade SMART-0${t.id} acoplada ao nó ${c.id}`,'agent');
+      await delay(2000); // Ritmo de varredura realista
+
+      const ev = sorteioEvento(c);
+      if(ev && ev.tipo==='bloq'){
+        INC.bloq++; c.evento='bloq'; t.eventos.push({type:'bloq',cac:c.id,motivo:ev.motivo});
+        setTicker(`OBSTRUÇÃO DE VIA: NÓ ${c.id}`,true); showNotif('bloq','ROTA IMPEDIDA',ev.motivo);
+        log(`[ALERTA] Linha obstruída em ${c.id}. Re-roteando unidade.`,'warn');
+        c.coletando=false; updateCac(c); await delay(2000); continue;
+      }
+      if(ev && ev.tipo==='vida'){
+        INC.vida++; c.evento='vida'; c.eventoDetalhe=ev.detalhe; t.eventos.push({type:'vida',cac:c.id});
+        setTicker(`ALERT BIOLÓGICO: NÓ ${c.id}`,true); showNotif('vida','DISPARO DE SENSOR IR',ev.detalhe.desc);
+        log(`[CRÍTICO] Sensor térmico acuso presença biológica no nó ${c.id}!`,'vida');
+        await delay(3000); log(`[RESOLUÇÃO] Protolo executado: ${RESOLUCOES[0]}`,'sec');
+        c.evento=null;
+      }
+
+      c.coletando=false; c.coletada=true; t.coletas++; updateCac(c); atualizarKpis(); renderTrucks(); drawChart();
+      log(`Nó ${c.id} purgado com sucesso.`,'result'); await delay(1500);
+    }
+    t.status='CONCLUÍDO'; renderTrucks();
+  });
+
+  await Promise.all(tarefas);
+  hideBanner(); setPhase(3); setBadge('done','FINALIZADO');
+  document.getElementById('resultadoBody').textContent='Operação concluída. Eficiência geral dentro das margens operacionais da SMARTTRASH.';
+  document.getElementById('resultado').classList.add('show');
+}
+
+function resetar(){
+  randomizarNiveis(); running=false;
+  document.getElementById('btnStart').disabled=false;
+  TRUCKS.forEach(t=>{t.coletas=0;t.total=0;t.status='STANDBY';t.rotas=[];t.eventos=[];});
+  INC.vida=0; INC.bloq=0; atualizarKpis(); renderCacambas(); renderTrucks(); drawChart();
+  document.getElementById('resultado').classList.remove('show');
+  document.getElementById('logFeed').innerHTML='';
+  setPhase(0); setBadge('idle','AGUARDANDO');
+}
+
+window.addEventListener('load',()=>{ renderCacambas(); renderTrucks(); drawChart(); });
+</script>
+</body>
+</html>
